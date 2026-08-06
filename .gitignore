@@ -68,3 +68,9 @@ captures
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
+
+# Proprietary JioPay SDK — not redistributed, each dev/CI must supply their own
+# copy (see android/libs/README.md)
+android/libs/*.aar
+example-app/android/app/libs/*.aar
+example-app/src/js/jiopay.config.js
