@@ -1,31 +1,26 @@
 # jiopay-capacitorjs
 
-Capacitorjs wrapper for JioPay. Currently supports Android (iOS is not implemented yet).
+Capacitorjs wrapper for JioPay's Hosted Checkout. Works on Web and Android (iOS not implemented yet).
 
-Two ways to take a payment:
+The plugin has a single method, **`openHostedCheckout()`**: it opens JioPay's browser-hosted
+checkout page for a `checkoutUrl` your own backend already obtained from JioPay's `initiateSale`
+API. It has no native SDK dependency — no proprietary `.aar` to source or wire into your build.
 
-- **`startPayment()`** — launches JioPay's native in-app UI (Card/UPI/Net Banking) via the
-  JioPay Java SDK and resolves with the final result. Android/iOS only (throws
-  `unavailable` on web).
-- **`openHostedCheckout()`** — opens JioPay's browser-hosted checkout page for a `checkoutUrl`
-  your own backend already obtained from JioPay's `initiateSale` API. Works on Web, Android,
-  and iOS. Useful as a fallback while native SDK integration is still being set up, since it
-  has no native dependency. It only launches the page and resolves — it does **not** return a
-  final payment status. Per JioPay's own docs, the browser-redirect path is UX-only; your
-  backend's S2S webhook (configured on the JioPay merchant dashboard) is the source of truth
-  for the actual transaction result.
+- **Android**: loads the page in an embedded WebView. Any non-http(s) navigation (e.g.
+  `upi://pay?...`) is handed off via an `ACTION_VIEW` Intent, so installed UPI apps still get
+  invoked the way they would in a real browser. The Promise resolves once the page navigates to
+  a URL starting with `returnUrlPrefix` (the same `returnURL` your backend passed to
+  `initiateSale`), with that URL and its parsed query params — closing the checkout screen
+  without reaching it (back button, swipe-away, etc.) instead rejects the Promise.
+- **Web**: a plain full-page redirect (`window.location.assign`), which unloads the current page
+  immediately — there's no separate "closed" step to detect there, so `returnUrlPrefix` is
+  ignored and the Promise resolves right away with empty `params`.
 
-### Android setup: the JioPay SDK AAR
-
-The native `startPayment()` flow depends on JioPay's proprietary `jio_payments_sdk.aar`,
-which is licensed per-merchant and is **not published to Maven or bundled with this package**.
-Before building an app that uses `startPayment()`:
-
-1. Obtain `jio_payments_sdk.aar` from JioPay for your merchant account.
-2. Place it at `android/libs/jio_payments_sdk.aar` in this plugin's source (see
-   `android/libs/README.md`). If you only need `openHostedCheckout()`, this step isn't required.
-
-`openHostedCheckout()` has no such dependency and works out of the box.
+It does **not** return a final payment status even when it resolves — per JioPay's own docs, the
+browser-redirect path is UX-only; your backend's S2S webhook (configured on the JioPay merchant
+dashboard) is the source of truth for the actual transaction result. Your backend must call
+`initiateSale` itself and hand this plugin the resulting `checkoutUrl` — the `secureHash` that
+call requires (computed from your Secret Key) must never be computed in app/browser JS.
 
 ## Install
 
@@ -51,7 +46,6 @@ npx cap sync
 
 <docgen-index>
 
-* [`startPayment(...)`](#startpayment)
 * [`openHostedCheckout(...)`](#openhostedcheckout)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -61,41 +55,33 @@ npx cap sync
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
-### startPayment(...)
-
-```typescript
-startPayment(options: JioPayStartPaymentOptions) => Promise<JioPayPaymentResult>
-```
-
-Launches JioPay's native in-app payment UI (Card/UPI/Net Banking) and
-resolves with the final payment result. Rejects if the user cancels or
-the SDK reports a failure. Android/iOS only.
-
-| Param         | Type                                                                            |
-| ------------- | ------------------------------------------------------------------------------- |
-| **`options`** | <code><a href="#jiopaystartpaymentoptions">JioPayStartPaymentOptions</a></code> |
-
-**Returns:** <code>Promise&lt;<a href="#jiopaypaymentresult">JioPayPaymentResult</a>&gt;</code>
-
---------------------
-
-
 ### openHostedCheckout(...)
 
 ```typescript
-openHostedCheckout(options: JioPayOpenHostedCheckoutOptions) => Promise<void>
+openHostedCheckout(options: JioPayOpenHostedCheckoutOptions) => Promise<JioPayHostedCheckoutResult>
 ```
 
 Opens JioPay's Hosted Checkout page for a `checkoutUrl` your backend
-already obtained from JioPay's `initiateSale` API. Resolves as soon as
-the page has been launched — it does NOT return a final payment status.
-Use this as a secondary path (e.g. while native SDK integration isn't
-ready yet). Your backend's S2S webhook remains the source of truth for
-the actual transaction result. Available on Web, Android, and iOS.
+already obtained from JioPay's `initiateSale` API.
+
+On Android, this loads the page in an embedded WebView. Any non-http(s)
+navigation (e.g. `upi://pay?...`) is handed off via an Android
+`ACTION_VIEW` Intent so installed UPI apps still get invoked the way
+they would in a real browser. The Promise resolves once the page
+navigates to a URL starting with `returnUrlPrefix` — whether the user
+gets there normally or backs/swipes out beforehand, the checkout screen
+closing without reaching that URL instead rejects the Promise.
+
+On Web, it's a full-page redirect (`window.location.assign`), which
+unloads the current page immediately — there is no separate "closed"
+signal there, so `returnUrlPrefix` is ignored and the returned Promise
+resolves right away with empty `params`.
 
 | Param         | Type                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------- |
 | **`options`** | <code><a href="#jiopayopenhostedcheckoutoptions">JioPayOpenHostedCheckoutOptions</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#jiopayhostedcheckoutresult">JioPayHostedCheckoutResult</a>&gt;</code>
 
 --------------------
 
@@ -103,55 +89,29 @@ the actual transaction result. Available on Web, Android, and iOS.
 ### Interfaces
 
 
-#### JioPayPaymentResult
+#### JioPayHostedCheckoutResult
 
-| Prop                  | Type                | Description                                          |
-| --------------------- | ------------------- | ---------------------------------------------------- |
-| **`status`**          | <code>string</code> |                                                      |
-| **`rawJsonResponse`** | <code>string</code> | Raw JSON response string returned by the JioPay SDK. |
-
-
-#### JioPayStartPaymentOptions
-
-| Prop                      | Type                                                            | Description                                                            |
-| ------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **`environment`**         | <code><a href="#jiopayenvironment">JioPayEnvironment</a></code> |                                                                        |
-| **`aggregatorId`**        | <code>string</code>                                             |                                                                        |
-| **`merchantId`**          | <code>string</code>                                             |                                                                        |
-| **`secret`**              | <code>string</code>                                             | Merchant secret key, used by the native SDK for hash-based validation. |
-| **`amount`**              | <code>string</code>                                             | Transaction amount, e.g. "100.00".                                     |
-| **`customerName`**        | <code>string</code>                                             |                                                                        |
-| **`customerEmailId`**     | <code>string</code>                                             |                                                                        |
-| **`merchantName`**        | <code>string</code>                                             |                                                                        |
-| **`merchantImage`**       | <code>string</code>                                             | URL of the merchant logo shown on the payment UI.                      |
-| **`merchantTxnNo`**       | <code>string</code>                                             | Unique merchant transaction number for this payment attempt.           |
-| **`timeout`**             | <code>number</code>                                             | Payment timeout in seconds.                                            |
-| **`paymentModesAllowed`** | <code>JioPayPaymentMode[]</code>                                |                                                                        |
+| Prop         | Type                                                            | Description                                                                                                                                                                                                                                                                                        |
+| ------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`url`**    | <code>string</code>                                             | The full URL the checkout page redirected to once it matched `returnUrlPrefix`.                                                                                                                                                                                                                    |
+| **`params`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Parsed query parameters from that URL — JioPay's B2B callback fields (e.g. `responseCode`, `merchantTxnNo`, `txnID`). Per JioPay's own docs this browser-redirect path is UX-only and not authoritative; your backend's S2S webhook remains the source of truth for the actual transaction result. |
 
 
 #### JioPayOpenHostedCheckoutOptions
 
-| Prop              | Type                | Description                                                                                                                                                                                                 |
-| ----------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`checkoutUrl`** | <code>string</code> | The `redirectURI` your backend obtained by calling JioPay's `initiateSale` API. Must be produced server-side — never compute the request's `secureHash` (which requires your Secret Key) in app/browser JS. |
+| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`checkoutUrl`**     | <code>string</code> | The `redirectURI` your backend obtained by calling JioPay's `initiateSale` API. Must be produced server-side — never compute the request's `secureHash` (which requires your Secret Key) in app/browser JS.                                                                                                                                                                                                                               |
+| **`returnUrlPrefix`** | <code>string</code> | The same `returnURL` your backend passed to JioPay's `initiateSale` API. On Android, once the checkout page navigates to a URL starting with this prefix, the native checkout screen closes and the Promise resolves with that URL and its parsed query params. Ignored on Web, where the page just does a full redirect and there's no separate "closed" step to detect — your returnURL page itself must read `window.location.search`. |
 
 
 ### Type Aliases
 
 
-#### JioPayEnvironment
+#### Record
 
-`UAT` targets JioPay's test environment (https://uat.jiopay.co.in), `PRODUCTION`
-targets the live environment. Verified against the JioPay Java SDK's actual
-constants once the AAR is available for inspection.
+Construct a type with a set of properties K of type T
 
-<code>'UAT' | 'PRODUCTION'</code>
-
-
-#### JioPayPaymentMode
-
-Payment methods the checkout UI is allowed to offer — matches the SDK's `PaymentMode` enum.
-
-<code>'CARD' | 'CARD_CC' | 'CARD_DC' | 'NB' | 'UPI' | 'UPI_QR' | 'UPI_INTENT' | 'UPI_VPA' | 'PLUXEE' | 'PAYTM' | 'AMAZON' | 'GOOGLE_PAY' | 'PHONE_PE' | 'BHIM' | 'CRED' | 'TRUECALLER_PAY'</code>
+<code>{ [P in K]: T; }</code>
 
 </docgen-api>

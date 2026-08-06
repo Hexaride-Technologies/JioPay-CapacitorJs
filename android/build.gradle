@@ -46,9 +46,6 @@ android {
 repositories {
     google()
     mavenCentral()
-    flatDir {
-        dirs 'libs'
-    }
 }
 
 
@@ -59,21 +56,4 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
-
-    // JioPay Java SDK — proprietary AAR, not on Maven. Place jio_payments_sdk.aar
-    // in this libs/ directory so this module compiles against it. compileOnly
-    // (not implementation) because AGP refuses to bundle a local .aar file
-    // inside another library's own .aar output ("Direct local .aar file
-    // dependencies are not supported when building an AAR"). The actual app
-    // module must add its own implementation dependency on the same AAR —
-    // see README / example-app/android/app/build.gradle.
-    compileOnly files('libs/jio_payments_sdk.aar')
-    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
-    api 'com.google.code.gson:gson:2.10.1'
-    api 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
-    implementation 'androidx.cardview:cardview:1.0.0'
-    implementation 'androidx.recyclerview:recyclerview:1.4.0'
-
-    // Chrome Custom Tabs, used by openHostedCheckout()
-    implementation 'androidx.browser:browser:1.8.0'
 }
