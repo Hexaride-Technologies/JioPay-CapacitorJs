@@ -1,17 +1,18 @@
 # jiopay-capacitorjs
 
-Capacitorjs wrapper for JioPay's Hosted Checkout. Works on Web and Android (iOS not implemented yet).
+Capacitorjs wrapper for JioPay's Hosted Checkout. Works on Web, Android, and iOS.
 
 The plugin has a single method, **`openHostedCheckout()`**: it opens JioPay's browser-hosted
 checkout page for a `checkoutUrl` your own backend already obtained from JioPay's `initiateSale`
 API. It has no native SDK dependency — no proprietary `.aar` to source or wire into your build.
 
-- **Android**: loads the page in an embedded WebView. Any non-http(s) navigation (e.g.
-  `upi://pay?...`) is handed off via an `ACTION_VIEW` Intent, so installed UPI apps still get
-  invoked the way they would in a real browser. The Promise resolves once the page navigates to
-  a URL starting with `returnUrlPrefix` (the same `returnURL` your backend passed to
-  `initiateSale`), with that URL and its parsed query params — closing the checkout screen
-  without reaching it (back button, swipe-away, etc.) instead rejects the Promise.
+- **Android/iOS**: loads the page in an embedded WebView (`WebView` on Android, `WKWebView` on
+  iOS). Any non-http(s) navigation (e.g. `upi://pay?...`) is handed off via an `ACTION_VIEW`
+  Intent (Android) / `UIApplication.open` (iOS), so installed UPI apps still get invoked the way
+  they would in a real browser. The Promise resolves once the page navigates to a URL starting
+  with `returnUrlPrefix` (the same `returnURL` your backend passed to `initiateSale`), with that
+  URL and its parsed query params — closing the checkout screen without reaching it (back
+  button, swipe-away, etc.) instead rejects the Promise.
 - **Web**: a plain full-page redirect (`window.location.assign`), which unloads the current page
   immediately — there's no separate "closed" step to detect there, so `returnUrlPrefix` is
   ignored and the Promise resolves right away with empty `params`.
@@ -64,13 +65,14 @@ openHostedCheckout(options: JioPayOpenHostedCheckoutOptions) => Promise<JioPayHo
 Opens JioPay's Hosted Checkout page for a `checkoutUrl` your backend
 already obtained from JioPay's `initiateSale` API.
 
-On Android, this loads the page in an embedded WebView. Any non-http(s)
-navigation (e.g. `upi://pay?...`) is handed off via an Android
-`ACTION_VIEW` Intent so installed UPI apps still get invoked the way
-they would in a real browser. The Promise resolves once the page
-navigates to a URL starting with `returnUrlPrefix` — whether the user
-gets there normally or backs/swipes out beforehand, the checkout screen
-closing without reaching that URL instead rejects the Promise.
+On Android/iOS, this loads the page in an embedded WebView (`WebView` /
+`WKWebView`). Any non-http(s) navigation (e.g. `upi://pay?...`) is
+handed off via an `ACTION_VIEW` Intent (Android) or `UIApplication.open`
+(iOS) so installed UPI apps still get invoked the way they would in a
+real browser. The Promise resolves once the page navigates to a URL
+starting with `returnUrlPrefix` — whether the user gets there normally
+or backs/swipes out beforehand, the checkout screen closing without
+reaching that URL instead rejects the Promise.
 
 On Web, it's a full-page redirect (`window.location.assign`), which
 unloads the current page immediately — there is no separate "closed"
@@ -99,10 +101,10 @@ resolves right away with empty `params`.
 
 #### JioPayOpenHostedCheckoutOptions
 
-| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| --------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`checkoutUrl`**     | <code>string</code> | The `redirectURI` your backend obtained by calling JioPay's `initiateSale` API. Must be produced server-side — never compute the request's `secureHash` (which requires your Secret Key) in app/browser JS.                                                                                                                                                                                                                               |
-| **`returnUrlPrefix`** | <code>string</code> | The same `returnURL` your backend passed to JioPay's `initiateSale` API. On Android, once the checkout page navigates to a URL starting with this prefix, the native checkout screen closes and the Promise resolves with that URL and its parsed query params. Ignored on Web, where the page just does a full redirect and there's no separate "closed" step to detect — your returnURL page itself must read `window.location.search`. |
+| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`checkoutUrl`**     | <code>string</code> | The `redirectURI` your backend obtained by calling JioPay's `initiateSale` API. Must be produced server-side — never compute the request's `secureHash` (which requires your Secret Key) in app/browser JS.                                                                                                                                                                                                                                   |
+| **`returnUrlPrefix`** | <code>string</code> | The same `returnURL` your backend passed to JioPay's `initiateSale` API. On Android/iOS, once the checkout page navigates to a URL starting with this prefix, the native checkout screen closes and the Promise resolves with that URL and its parsed query params. Ignored on Web, where the page just does a full redirect and there's no separate "closed" step to detect — your returnURL page itself must read `window.location.search`. |
 
 
 ### Type Aliases

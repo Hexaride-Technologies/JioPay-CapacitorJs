@@ -1,7 +1,34 @@
 import Foundation
+import UIKit
 
-// iOS native implementation is not yet built — Android is implemented first.
-// See src/definitions.ts for the JioPayCapacitorJsPlugin interface this
-// class will need to implement (startPayment, openHostedCheckout).
+enum JioPayCheckoutError: Error {
+    case invalidCheckoutUrl
+    case closedBeforeCompletion
+}
+
 @objc public class JioPayCapacitorJs: NSObject {
+    func openHostedCheckout(
+        checkoutUrl: String,
+        returnUrlPrefix: String,
+        presentingViewController: UIViewController,
+        completion: @escaping (Result<(url: String, params: [String: String]), JioPayCheckoutError>) -> Void
+    ) {
+        guard let url = URL(string: checkoutUrl) else {
+            completion(.failure(.invalidCheckoutUrl))
+            return
+        }
+
+        let checkoutViewController = HostedCheckoutViewController(checkoutUrl: url, returnUrlPrefix: returnUrlPrefix) { outcome in
+            switch outcome {
+            case .landed(let landedUrl, let params):
+                completion(.success((url: landedUrl, params: params)))
+            case .closed:
+                completion(.failure(.closedBeforeCompletion))
+            }
+        }
+
+        let navigationController = UINavigationController(rootViewController: checkoutViewController)
+        navigationController.modalPresentationStyle = .fullScreen
+        presentingViewController.present(navigationController, animated: true)
+    }
 }
