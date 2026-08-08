@@ -102,16 +102,15 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
     }
 
     private func updateBackButton() {
-        let title = webView.canGoBack ? "Back" : "Close"
-        navigationItem.leftBarButtonItem = UIBarButtonItem(title: title, style: .plain, target: self, action: #selector(backButtonTapped))
+        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "Close", style: .plain, target: self, action: #selector(backButtonTapped))
     }
 
+    // Never calls webView.goBack() — letting the bar button navigate the
+    // page can trigger unexpected behavior mid-checkout (e.g. re-submitting
+    // a form, landing on a stale bank/ACS step). It always shows the cancel
+    // confirmation instead.
     @objc private func backButtonTapped() {
-        if webView.canGoBack {
-            webView.goBack()
-        } else {
-            confirmClose()
-        }
+        confirmClose()
     }
 
     private func confirmClose() {

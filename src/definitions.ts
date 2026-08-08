@@ -17,14 +17,14 @@ export interface JioPayOpenHostedCheckoutOptions {
    */
   returnUrlPrefix: string;
   /**
-   * Android only. Shows an app bar with a Back/Close button above the
-   * checkout WebView. Defaults to `false` — the system back button/gesture
-   * already provides the same behavior (walk WebView history, then close),
-   * so this is opt-in for apps that want a visible affordance too. Ignored
-   * on iOS, which always shows this bar (there's no OS-level back gesture
-   * there to fall back on — the checkout screen is presented `.fullScreen`
-   * specifically to prevent an accidental swipe-to-dismiss mid-payment, so
-   * the bar's Back/Close button is the only way to leave). Ignored on Web.
+   * Android only. Shows an app bar with a Close button above the checkout
+   * WebView. Defaults to `false` — the system back button/gesture already
+   * shows the same "Cancel payment?" confirmation, so this is opt-in for
+   * apps that want a visible affordance too. Ignored on iOS, which always
+   * shows this bar (there's no OS-level back gesture there to fall back on
+   * — the checkout screen is presented `.fullScreen` specifically to
+   * prevent an accidental swipe-to-dismiss mid-payment, so the bar's Close
+   * button is the only way to leave). Ignored on Web.
    */
   showAppBar?: boolean;
   /**

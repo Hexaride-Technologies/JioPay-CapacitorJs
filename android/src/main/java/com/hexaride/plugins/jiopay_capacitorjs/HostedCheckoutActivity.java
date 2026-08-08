@@ -161,7 +161,7 @@ public class HostedCheckoutActivity extends AppCompatActivity {
                 new OnBackPressedCallback(true) {
                     @Override
                     public void handleOnBackPressed() {
-                        handleBackOrClose();
+                        confirmClose();
                     }
                 }
             );
@@ -174,18 +174,14 @@ public class HostedCheckoutActivity extends AppCompatActivity {
 
     @Override
     public boolean onSupportNavigateUp() {
-        handleBackOrClose();
+        confirmClose();
         return true;
     }
 
-    private void handleBackOrClose() {
-        if (webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            confirmClose();
-        }
-    }
-
+    // Back button never walks WebView history via goBack() — letting it
+    // navigate the page can trigger unexpected behavior mid-checkout (e.g.
+    // re-submitting a form, landing on a stale bank/ACS step). It always
+    // shows the cancel confirmation instead.
     private void confirmClose() {
         new AlertDialog.Builder(this)
             .setTitle("Cancel payment?")
