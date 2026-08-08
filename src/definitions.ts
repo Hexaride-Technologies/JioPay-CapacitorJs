@@ -4,7 +4,8 @@ export interface JioPayOpenHostedCheckoutOptions {
   /**
    * The `redirectURI` your backend obtained by calling JioPay's `initiateSale`
    * API. Must be produced server-side — never compute the request's
-   * `secureHash` (which requires your Secret Key) in app/browser JS.
+   * `secureHash` (which requires your Secret Key) in app/browser JS. Must be
+   * an `http(s)` URL — anything else is rejected before it's ever loaded.
    */
   checkoutUrl: string;
   /**
@@ -38,14 +39,19 @@ export interface JioPayOpenHostedCheckoutOptions {
 }
 
 export interface JioPayHostedCheckoutResult {
-  /** The full URL the checkout page redirected to once it matched `returnUrlPrefix`. */
+  /**
+   * The full URL the checkout page redirected to once it matched
+   * `returnUrlPrefix`. On Web, where there's no separate "closed" step to
+   * detect (see `openHostedCheckout`), this is just the input `checkoutUrl`
+   * echoed back.
+   */
   url: string;
   /**
    * Parsed query parameters from that URL — JioPay's B2B callback fields
    * (e.g. `responseCode`, `merchantTxnNo`, `txnID`). Per JioPay's own docs
    * this browser-redirect path is UX-only and not authoritative; your
    * backend's S2S webhook remains the source of truth for the actual
-   * transaction result.
+   * transaction result. Always empty on Web — see `openHostedCheckout`.
    */
   params: Record<string, string>;
 }

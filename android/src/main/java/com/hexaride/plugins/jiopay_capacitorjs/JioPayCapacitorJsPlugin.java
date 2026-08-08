@@ -22,6 +22,10 @@ public class JioPayCapacitorJsPlugin extends Plugin {
             call.reject("Missing required option: checkoutUrl");
             return;
         }
+        if (!checkoutUrl.startsWith("http://") && !checkoutUrl.startsWith("https://")) {
+            call.reject("Invalid checkoutUrl: must be an http(s) URL");
+            return;
+        }
 
         String returnUrlPrefix = call.getString("returnUrlPrefix");
         if (returnUrlPrefix == null || returnUrlPrefix.isEmpty()) {
@@ -57,6 +61,10 @@ public class JioPayCapacitorJsPlugin extends Plugin {
         }
 
         String landedUrl = data.getStringExtra(HostedCheckoutActivity.EXTRA_LANDED_URL);
+        if (landedUrl == null) {
+            call.reject("Checkout closed without a landed URL");
+            return;
+        }
         Uri uri = Uri.parse(landedUrl);
 
         JSObject params = new JSObject();

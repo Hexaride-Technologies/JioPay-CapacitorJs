@@ -4,6 +4,7 @@
     <application>
         <activity
             android:name=".HostedCheckoutActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
     </application>
 </manifest>

@@ -14,7 +14,7 @@ enum JioPayCheckoutError: Error {
         presentingViewController: UIViewController,
         completion: @escaping (Result<(url: String, params: [String: String]), JioPayCheckoutError>) -> Void
     ) {
-        guard let url = URL(string: checkoutUrl) else {
+        guard let url = URL(string: checkoutUrl), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
             completion(.failure(.invalidCheckoutUrl))
             return
         }
