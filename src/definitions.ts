@@ -51,18 +51,17 @@ export interface JioPayHostedCheckoutResult {
 }
 
 export interface JioPayCheckoutEvent {
-  /** Whether this checkout attempt succeeded or failed. */
-  status: 'success' | 'fail';
   /**
-   * Set to `'cancelled'` when the checkout screen closed before ever
-   * reaching `returnUrlPrefix` (e.g. the user backed/swiped out). Absent
-   * when a `responseCode` was actually received — including a failure code,
-   * which is still `status: 'fail'` but without this field.
+   * `'success'`/`'fail'` mean the checkout page actually reached
+   * `returnUrlPrefix` with a gateway response. `'cancelled'` means the
+   * checkout screen closed before that ever happened (e.g. the user
+   * backed/swiped out) — no gateway response was received, so unlike
+   * `'fail'` there's typically nothing to reconcile with your backend.
    */
-  reason?: 'cancelled';
-  /** Present unless `reason` is `'cancelled'` — the URL that matched `returnUrlPrefix`. */
+  status: 'success' | 'fail' | 'cancelled';
+  /** Present for `success`/`fail` — the URL that matched `returnUrlPrefix`. Absent for `cancelled`. */
   url?: string;
-  /** Present unless `reason` is `'cancelled'` — parsed query params from that URL. */
+  /** Present for `success`/`fail` — parsed query params from that URL. Absent for `cancelled`. */
   params?: Record<string, string>;
 }
 
@@ -79,14 +78,14 @@ export interface JioPayCapacitorJsPlugin {
    * `returnUrlPrefix` (back button, swipe-away, etc.) shows a "Cancel
    * payment?" confirmation dialog first — only actually closing (and
    * rejecting the Promise) once the user confirms. See the `success`/`fail`/
-   * `complete` listeners below for a status-aware alternative to awaiting
-   * this Promise directly.
+   * `cancelled`/`complete` listeners below for a status-aware alternative to
+   * awaiting this Promise directly.
    *
    * On Web, it's a full-page redirect (`window.location.assign`), which
    * unloads the current page immediately — there is no separate "closed"
    * signal there, so `returnUrlPrefix` is ignored and the returned Promise
-   * resolves right away with empty `params`. No `success`/`fail`/`complete`
-   * events fire on Web for the same reason.
+   * resolves right away with empty `params`. No `success`/`fail`/`cancelled`/
+   * `complete` events fire on Web for the same reason.
    */
   openHostedCheckout(options: JioPayOpenHostedCheckoutOptions): Promise<JioPayHostedCheckoutResult>;
 
@@ -97,16 +96,24 @@ export interface JioPayCapacitorJsPlugin {
   addListener(eventName: 'success', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
 
   /**
-   * Fired on Android/iOS when checkout fails — either the page reached
-   * `returnUrlPrefix` with a non-success `responseCode`, or the checkout
-   * screen closed before reaching it at all (`reason: 'cancelled'`).
+   * Fired on Android/iOS when the checkout page reaches `returnUrlPrefix`
+   * with a non-success `responseCode` — an actual gateway response, just
+   * not a successful one.
    */
   addListener(eventName: 'fail', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
 
   /**
-   * Fired on Android/iOS after every checkout attempt, whether it succeeded
-   * or failed — always paired with a `success` or `fail` event carrying the
-   * same data.
+   * Fired on Android/iOS when the checkout screen closes before ever
+   * reaching `returnUrlPrefix` (e.g. the user backed/swiped out, or
+   * confirmed "Leave" on the "Cancel payment?" dialog). No gateway response
+   * was received, so there's typically nothing to check with your backend
+   * for this case — unlike `fail`.
+   */
+  addListener(eventName: 'cancelled', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
+
+  /**
+   * Fired on Android/iOS after every checkout attempt — always paired with
+   * a `success`, `fail`, or `cancelled` event carrying the same data.
    */
   addListener(eventName: 'complete', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
 

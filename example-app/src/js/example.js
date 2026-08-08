@@ -13,6 +13,10 @@ JioPayCapacitorJs.addListener('fail', (event) => {
   console.log('[JioPay] fail', event);
 });
 
+JioPayCapacitorJs.addListener('cancelled', (event) => {
+  console.log('[JioPay] cancelled', event);
+});
+
 JioPayCapacitorJs.addListener('complete', (event) => {
   console.log('[JioPay] complete', event);
 });

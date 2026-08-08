@@ -49,9 +49,8 @@ public class JioPayCapacitorJsPlugin extends Plugin {
         Intent data = result.getData();
         if (result.getResultCode() != Activity.RESULT_OK || data == null) {
             JSObject eventData = new JSObject();
-            eventData.put("status", "fail");
-            eventData.put("reason", "cancelled");
-            notifyListeners("fail", eventData);
+            eventData.put("status", "cancelled");
+            notifyListeners("cancelled", eventData);
             notifyListeners("complete", eventData);
             call.reject("Checkout closed before reaching the return URL");
             return;

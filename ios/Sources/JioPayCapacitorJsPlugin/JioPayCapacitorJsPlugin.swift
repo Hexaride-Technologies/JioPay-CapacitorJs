@@ -52,8 +52,8 @@ public class JioPayCapacitorJsPlugin: CAPPlugin, CAPBridgedPlugin {
                 case .failure(.invalidCheckoutUrl):
                     call.reject("Invalid checkoutUrl")
                 case .failure(.closedBeforeCompletion):
-                    let eventData: [String: Any] = ["status": "fail", "reason": "cancelled"]
-                    self.notifyListeners("fail", data: eventData)
+                    let eventData: [String: Any] = ["status": "cancelled"]
+                    self.notifyListeners("cancelled", data: eventData)
                     self.notifyListeners("complete", data: eventData)
                     call.reject("Checkout closed before reaching the return URL")
                 }
