@@ -36,10 +36,22 @@ public class JioPayCapacitorJsPlugin: CAPPlugin, CAPBridgedPlugin {
             ) { result in
                 switch result {
                 case .success(let landed):
+                    // JioPay's B2B callback uses responseCode "0000" for a
+                    // successful transaction (matches the S2S webhook
+                    // payload shape); anything else is a failure. This is
+                    // UX-only, same caveat as the rest of this flow.
+                    let isSuccess = landed.params["responseCode"] == "0000"
+                    let status = isSuccess ? "success" : "fail"
+                    let eventData: [String: Any] = ["status": status, "url": landed.url, "params": landed.params]
+                    self.notifyListeners(status, data: eventData)
+                    self.notifyListeners("complete", data: eventData)
                     call.resolve(["url": landed.url, "params": landed.params])
                 case .failure(.invalidCheckoutUrl):
                     call.reject("Invalid checkoutUrl")
                 case .failure(.closedBeforeCompletion):
+                    let eventData: [String: Any] = ["status": "fail", "reason": "cancelled"]
+                    self.notifyListeners("fail", data: eventData)
+                    self.notifyListeners("complete", data: eventData)
                     call.reject("Checkout closed before reaching the return URL")
                 }
             }

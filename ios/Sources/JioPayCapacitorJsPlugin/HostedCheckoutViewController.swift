@@ -65,9 +65,25 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
         if webView.canGoBack {
             webView.goBack()
         } else {
-            reportOutcome(.closed)
-            dismiss(animated: true)
+            confirmClose()
         }
+    }
+
+    private func confirmClose() {
+        let alert = UIAlertController(
+            title: "Cancel payment?",
+            message: "Are you sure you want to leave? Your payment will not be completed.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Stay", style: .cancel))
+        alert.addAction(
+            UIAlertAction(title: "Leave", style: .destructive) { [weak self] _ in
+                guard let self else { return }
+                self.reportOutcome(.closed)
+                self.dismiss(animated: true)
+            }
+        )
+        present(alert, animated: true)
     }
 
     private func reportOutcome(_ outcome: HostedCheckoutOutcome) {

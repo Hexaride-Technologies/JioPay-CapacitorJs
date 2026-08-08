@@ -11,8 +11,13 @@ API. It has no native SDK dependency — no proprietary `.aar` to source or wire
   Intent (Android) / `UIApplication.open` (iOS), so installed UPI apps still get invoked the way
   they would in a real browser. The Promise resolves once the page navigates to a URL starting
   with `returnUrlPrefix` (the same `returnURL` your backend passed to `initiateSale`), with that
-  URL and its parsed query params — closing the checkout screen without reaching it (back
-  button, swipe-away, etc.) instead rejects the Promise.
+  URL and its parsed query params. Trying to close the checkout screen before reaching it (back
+  button, swipe-away, etc.) shows a "Cancel payment?" confirmation dialog first — only actually
+  closing (and rejecting the Promise) once the user confirms.
+  - Android also accepts `showAppBar` (default `false`): an optional app bar with a Back/Close
+    button, in addition to the always-available system back button/gesture. iOS always shows
+    this bar (there's no OS back gesture to fall back on there — the screen is presented
+    full-screen specifically to prevent an accidental swipe-dismiss mid-payment).
 - **Web**: a plain full-page redirect (`window.location.assign`), which unloads the current page
   immediately — there's no separate "closed" step to detect there, so `returnUrlPrefix` is
   ignored and the Promise resolves right away with empty `params`.
@@ -48,6 +53,10 @@ npx cap sync
 <docgen-index>
 
 * [`openHostedCheckout(...)`](#openhostedcheckout)
+* [`addListener('success', ...)`](#addlistenersuccess-)
+* [`addListener('fail', ...)`](#addlistenerfail-)
+* [`addListener('complete', ...)`](#addlistenercomplete-)
+* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 
@@ -69,21 +78,94 @@ On Android/iOS, this loads the page in an embedded WebView (`WebView` /
 `WKWebView`). Any non-http(s) navigation (e.g. `upi://pay?...`) is
 handed off via an `ACTION_VIEW` Intent (Android) or `UIApplication.open`
 (iOS) so installed UPI apps still get invoked the way they would in a
-real browser. The Promise resolves once the page navigates to a URL
-starting with `returnUrlPrefix` — whether the user gets there normally
-or backs/swipes out beforehand, the checkout screen closing without
-reaching that URL instead rejects the Promise.
+real browser. Trying to close the checkout screen before reaching
+`returnUrlPrefix` (back button, swipe-away, etc.) shows a "Cancel
+payment?" confirmation dialog first — only actually closing (and
+rejecting the Promise) once the user confirms. See the `success`/`fail`/
+`complete` listeners below for a status-aware alternative to awaiting
+this Promise directly.
 
 On Web, it's a full-page redirect (`window.location.assign`), which
 unloads the current page immediately — there is no separate "closed"
 signal there, so `returnUrlPrefix` is ignored and the returned Promise
-resolves right away with empty `params`.
+resolves right away with empty `params`. No `success`/`fail`/`complete`
+events fire on Web for the same reason.
 
 | Param         | Type                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------- |
 | **`options`** | <code><a href="#jiopayopenhostedcheckoutoptions">JioPayOpenHostedCheckoutOptions</a></code> |
 
 **Returns:** <code>Promise&lt;<a href="#jiopayhostedcheckoutresult">JioPayHostedCheckoutResult</a>&gt;</code>
+
+--------------------
+
+
+### addListener('success', ...)
+
+```typescript
+addListener(eventName: 'success', listenerFunc: (event: JioPayCheckoutEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Fired on Android/iOS when the checkout page reaches `returnUrlPrefix`
+with a `responseCode` of `"0000"`.
+
+| Param              | Type                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'success'</code>                                                                  |
+| **`listenerFunc`** | <code>(event: <a href="#jiopaycheckoutevent">JioPayCheckoutEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('fail', ...)
+
+```typescript
+addListener(eventName: 'fail', listenerFunc: (event: JioPayCheckoutEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Fired on Android/iOS when checkout fails — either the page reached
+`returnUrlPrefix` with a non-success `responseCode`, or the checkout
+screen closed before reaching it at all (`reason: 'cancelled'`).
+
+| Param              | Type                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'fail'</code>                                                                     |
+| **`listenerFunc`** | <code>(event: <a href="#jiopaycheckoutevent">JioPayCheckoutEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('complete', ...)
+
+```typescript
+addListener(eventName: 'complete', listenerFunc: (event: JioPayCheckoutEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Fired on Android/iOS after every checkout attempt, whether it succeeded
+or failed — always paired with a `success` or `fail` event carrying the
+same data.
+
+| Param              | Type                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'complete'</code>                                                                 |
+| **`listenerFunc`** | <code>(event: <a href="#jiopaycheckoutevent">JioPayCheckoutEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### removeAllListeners()
+
+```typescript
+removeAllListeners() => Promise<void>
+```
+
+Removes all listeners registered on this plugin.
 
 --------------------
 
@@ -101,10 +183,28 @@ resolves right away with empty `params`.
 
 #### JioPayOpenHostedCheckoutOptions
 
-| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`checkoutUrl`**     | <code>string</code> | The `redirectURI` your backend obtained by calling JioPay's `initiateSale` API. Must be produced server-side — never compute the request's `secureHash` (which requires your Secret Key) in app/browser JS.                                                                                                                                                                                                                                   |
-| **`returnUrlPrefix`** | <code>string</code> | The same `returnURL` your backend passed to JioPay's `initiateSale` API. On Android/iOS, once the checkout page navigates to a URL starting with this prefix, the native checkout screen closes and the Promise resolves with that URL and its parsed query params. Ignored on Web, where the page just does a full redirect and there's no separate "closed" step to detect — your returnURL page itself must read `window.location.search`. |
+| Prop                  | Type                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`checkoutUrl`**     | <code>string</code>  | The `redirectURI` your backend obtained by calling JioPay's `initiateSale` API. Must be produced server-side — never compute the request's `secureHash` (which requires your Secret Key) in app/browser JS.                                                                                                                                                                                                                                                                                                                                                                       |
+| **`returnUrlPrefix`** | <code>string</code>  | The same `returnURL` your backend passed to JioPay's `initiateSale` API. On Android/iOS, once the checkout page navigates to a URL starting with this prefix, the native checkout screen closes and the Promise resolves with that URL and its parsed query params. Ignored on Web, where the page just does a full redirect and there's no separate "closed" step to detect — your returnURL page itself must read `window.location.search`.                                                                                                                                     |
+| **`showAppBar`**      | <code>boolean</code> | Android only. Shows an app bar with a Back/Close button above the checkout WebView. Defaults to `false` — the system back button/gesture already provides the same behavior (walk WebView history, then close), so this is opt-in for apps that want a visible affordance too. Ignored on iOS, which always shows this bar (there's no OS-level back gesture there to fall back on — the checkout screen is presented `.fullScreen` specifically to prevent an accidental swipe-to-dismiss mid-payment, so the bar's Back/Close button is the only way to leave). Ignored on Web. |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
+
+
+#### JioPayCheckoutEvent
+
+| Prop         | Type                                                            | Description                                                                                                                                                                                                                                                           |
+| ------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`status`** | <code>'success' \| 'fail'</code>                                | Whether this checkout attempt succeeded or failed.                                                                                                                                                                                                                    |
+| **`reason`** | <code>'cancelled'</code>                                        | Set to `'cancelled'` when the checkout screen closed before ever reaching `returnUrlPrefix` (e.g. the user backed/swiped out). Absent when a `responseCode` was actually received — including a failure code, which is still `status: 'fail'` but without this field. |
+| **`url`**    | <code>string</code>                                             | Present unless `reason` is `'cancelled'` — the URL that matched `returnUrlPrefix`.                                                                                                                                                                                    |
+| **`params`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Present unless `reason` is `'cancelled'` — parsed query params from that URL.                                                                                                                                                                                         |
 
 
 ### Type Aliases

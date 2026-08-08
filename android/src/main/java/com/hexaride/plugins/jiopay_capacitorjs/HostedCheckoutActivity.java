@@ -15,6 +15,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import androidx.activity.OnBackPressedCallback;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
@@ -28,6 +29,7 @@ public class HostedCheckoutActivity extends AppCompatActivity {
 
     static final String EXTRA_CHECKOUT_URL = "checkoutUrl";
     static final String EXTRA_RETURN_URL_PREFIX = "returnUrlPrefix";
+    static final String EXTRA_SHOW_APP_BAR = "showAppBar";
     static final String EXTRA_LANDED_URL = "landedUrl";
 
     private WebView webView;
@@ -40,10 +42,24 @@ public class HostedCheckoutActivity extends AppCompatActivity {
 
         String checkoutUrl = getIntent().getStringExtra(EXTRA_CHECKOUT_URL);
         String returnUrlPrefix = getIntent().getStringExtra(EXTRA_RETURN_URL_PREFIX);
+        boolean showAppBar = getIntent().getBooleanExtra(EXTRA_SHOW_APP_BAR, false);
         if (checkoutUrl == null) {
             setResult(Activity.RESULT_CANCELED);
             finish();
             return;
+        }
+
+        // AppCompatActivity shows the app's default ActionBar unless told
+        // otherwise — we only extend it for getOnBackPressedDispatcher() and
+        // (optionally) this bar, so hide it entirely unless showAppBar asked
+        // for it, and wire its Up button to the same back/close logic as the
+        // system back button.
+        if (getSupportActionBar() != null) {
+            if (showAppBar) {
+                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            } else {
+                getSupportActionBar().hide();
+            }
         }
 
         webView = new WebView(this);
@@ -74,6 +90,14 @@ public class HostedCheckoutActivity extends AppCompatActivity {
 
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                // shouldOverrideUrlLoading is never called for POST navigations
+                // (e.g. bank/ACS pages that auto-submit a form back to the
+                // return URL), so the prefix check is duplicated here since
+                // onPageStarted fires regardless of GET/POST.
+                if (returnUrlPrefix != null && url.startsWith(returnUrlPrefix)) {
+                    finishWithResult(url);
+                    return;
+                }
                 progressBar.setVisibility(View.VISIBLE);
             }
 
@@ -103,15 +127,36 @@ public class HostedCheckoutActivity extends AppCompatActivity {
                 new OnBackPressedCallback(true) {
                     @Override
                     public void handleOnBackPressed() {
-                        if (webView.canGoBack()) {
-                            webView.goBack();
-                        } else {
-                            setEnabled(false);
-                            getOnBackPressedDispatcher().onBackPressed();
-                        }
+                        handleBackOrClose();
                     }
                 }
             );
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        handleBackOrClose();
+        return true;
+    }
+
+    private void handleBackOrClose() {
+        if (webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            confirmClose();
+        }
+    }
+
+    private void confirmClose() {
+        new AlertDialog.Builder(this)
+            .setTitle("Cancel payment?")
+            .setMessage("Are you sure you want to leave? Your payment will not be completed.")
+            .setPositiveButton("Leave", (dialog, which) -> {
+                setResult(Activity.RESULT_CANCELED);
+                finish();
+            })
+            .setNegativeButton("Stay", null)
+            .show();
     }
 
     private void finishWithResult(String landedUrl) {

@@ -29,9 +29,12 @@ public class JioPayCapacitorJsPlugin extends Plugin {
             return;
         }
 
+        boolean showAppBar = Boolean.TRUE.equals(call.getBoolean("showAppBar", false));
+
         Intent intent = new Intent(getContext(), HostedCheckoutActivity.class);
         intent.putExtra(HostedCheckoutActivity.EXTRA_CHECKOUT_URL, checkoutUrl);
         intent.putExtra(HostedCheckoutActivity.EXTRA_RETURN_URL_PREFIX, returnUrlPrefix);
+        intent.putExtra(HostedCheckoutActivity.EXTRA_SHOW_APP_BAR, showAppBar);
         startActivityForResult(call, intent, "handleCheckoutResult");
     }
 
@@ -43,6 +46,11 @@ public class JioPayCapacitorJsPlugin extends Plugin {
 
         Intent data = result.getData();
         if (result.getResultCode() != Activity.RESULT_OK || data == null) {
+            JSObject eventData = new JSObject();
+            eventData.put("status", "fail");
+            eventData.put("reason", "cancelled");
+            notifyListeners("fail", eventData);
+            notifyListeners("complete", eventData);
             call.reject("Checkout closed before reaching the return URL");
             return;
         }
@@ -55,6 +63,19 @@ public class JioPayCapacitorJsPlugin extends Plugin {
         for (String key : keys) {
             params.put(key, uri.getQueryParameter(key));
         }
+
+        // JioPay's B2B callback uses responseCode "0000" for a successful
+        // transaction (matches the S2S webhook payload shape); anything else
+        // is a failure. This is UX-only, same caveat as the rest of this flow.
+        boolean isSuccess = "0000".equals(uri.getQueryParameter("responseCode"));
+        String status = isSuccess ? "success" : "fail";
+
+        JSObject eventData = new JSObject();
+        eventData.put("status", status);
+        eventData.put("url", landedUrl);
+        eventData.put("params", params);
+        notifyListeners(status, eventData);
+        notifyListeners("complete", eventData);
 
         JSObject ret = new JSObject();
         ret.put("url", landedUrl);

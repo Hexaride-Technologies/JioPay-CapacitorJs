@@ -1,3 +1,5 @@
+import type { PluginListenerHandle } from '@capacitor/core';
+
 export interface JioPayOpenHostedCheckoutOptions {
   /**
    * The `redirectURI` your backend obtained by calling JioPay's `initiateSale`
@@ -14,6 +16,17 @@ export interface JioPayOpenHostedCheckoutOptions {
    * detect — your returnURL page itself must read `window.location.search`.
    */
   returnUrlPrefix: string;
+  /**
+   * Android only. Shows an app bar with a Back/Close button above the
+   * checkout WebView. Defaults to `false` — the system back button/gesture
+   * already provides the same behavior (walk WebView history, then close),
+   * so this is opt-in for apps that want a visible affordance too. Ignored
+   * on iOS, which always shows this bar (there's no OS-level back gesture
+   * there to fall back on — the checkout screen is presented `.fullScreen`
+   * specifically to prevent an accidental swipe-to-dismiss mid-payment, so
+   * the bar's Back/Close button is the only way to leave). Ignored on Web.
+   */
+  showAppBar?: boolean;
 }
 
 export interface JioPayHostedCheckoutResult {
@@ -29,6 +42,22 @@ export interface JioPayHostedCheckoutResult {
   params: Record<string, string>;
 }
 
+export interface JioPayCheckoutEvent {
+  /** Whether this checkout attempt succeeded or failed. */
+  status: 'success' | 'fail';
+  /**
+   * Set to `'cancelled'` when the checkout screen closed before ever
+   * reaching `returnUrlPrefix` (e.g. the user backed/swiped out). Absent
+   * when a `responseCode` was actually received — including a failure code,
+   * which is still `status: 'fail'` but without this field.
+   */
+  reason?: 'cancelled';
+  /** Present unless `reason` is `'cancelled'` — the URL that matched `returnUrlPrefix`. */
+  url?: string;
+  /** Present unless `reason` is `'cancelled'` — parsed query params from that URL. */
+  params?: Record<string, string>;
+}
+
 export interface JioPayCapacitorJsPlugin {
   /**
    * Opens JioPay's Hosted Checkout page for a `checkoutUrl` your backend
@@ -38,15 +67,41 @@ export interface JioPayCapacitorJsPlugin {
    * `WKWebView`). Any non-http(s) navigation (e.g. `upi://pay?...`) is
    * handed off via an `ACTION_VIEW` Intent (Android) or `UIApplication.open`
    * (iOS) so installed UPI apps still get invoked the way they would in a
-   * real browser. The Promise resolves once the page navigates to a URL
-   * starting with `returnUrlPrefix` — whether the user gets there normally
-   * or backs/swipes out beforehand, the checkout screen closing without
-   * reaching that URL instead rejects the Promise.
+   * real browser. Trying to close the checkout screen before reaching
+   * `returnUrlPrefix` (back button, swipe-away, etc.) shows a "Cancel
+   * payment?" confirmation dialog first — only actually closing (and
+   * rejecting the Promise) once the user confirms. See the `success`/`fail`/
+   * `complete` listeners below for a status-aware alternative to awaiting
+   * this Promise directly.
    *
    * On Web, it's a full-page redirect (`window.location.assign`), which
    * unloads the current page immediately — there is no separate "closed"
    * signal there, so `returnUrlPrefix` is ignored and the returned Promise
-   * resolves right away with empty `params`.
+   * resolves right away with empty `params`. No `success`/`fail`/`complete`
+   * events fire on Web for the same reason.
    */
   openHostedCheckout(options: JioPayOpenHostedCheckoutOptions): Promise<JioPayHostedCheckoutResult>;
+
+  /**
+   * Fired on Android/iOS when the checkout page reaches `returnUrlPrefix`
+   * with a `responseCode` of `"0000"`.
+   */
+  addListener(eventName: 'success', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
+
+  /**
+   * Fired on Android/iOS when checkout fails — either the page reached
+   * `returnUrlPrefix` with a non-success `responseCode`, or the checkout
+   * screen closed before reaching it at all (`reason: 'cancelled'`).
+   */
+  addListener(eventName: 'fail', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
+
+  /**
+   * Fired on Android/iOS after every checkout attempt, whether it succeeded
+   * or failed — always paired with a `success` or `fail` event carrying the
+   * same data.
+   */
+  addListener(eventName: 'complete', listenerFunc: (event: JioPayCheckoutEvent) => void): Promise<PluginListenerHandle>;
+
+  /** Removes all listeners registered on this plugin. */
+  removeAllListeners(): Promise<void>;
 }

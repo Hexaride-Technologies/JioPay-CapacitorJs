@@ -5,9 +5,21 @@ function showResult(message) {
   document.getElementById('result').textContent = message;
 }
 
+JioPayCapacitorJs.addListener('success', (event) => {
+  console.log('[JioPay] success', event);
+});
+
+JioPayCapacitorJs.addListener('fail', (event) => {
+  console.log('[JioPay] fail', event);
+});
+
+JioPayCapacitorJs.addListener('complete', (event) => {
+  console.log('[JioPay] complete', event);
+});
+
 window.payViaHostedCheckout = async () => {
   try {
-    const checkoutUrl = document.getElementById('checkoutUrl').value
+    const checkoutUrl = document.getElementById('checkoutUrl').value;
     const result = await JioPayCapacitorJs.openHostedCheckout({
       checkoutUrl: checkoutUrl,
       returnUrlPrefix: jioPayConfig.returnUrlPrefix,
