@@ -1,6 +1,6 @@
 {
   "name": "jiopay-capacitorjs",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "description": "Capacitorjs wrapper for jiopay",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -19,10 +19,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com//jiopay-capacitorjs.git"
+    "url": "git+https://github.com/Hexaride-Technologies/JioPay-CapacitorJs.git"
   },
   "bugs": {
-    "url": "https://github.com//jiopay-capacitorjs/issues"
+    "url": "https://github.com/Hexaride-Technologies/JioPay-CapacitorJs/issues"
   },
   "keywords": [
     "capacitor",
