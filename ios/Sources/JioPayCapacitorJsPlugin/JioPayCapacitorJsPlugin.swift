@@ -28,10 +28,13 @@ public class JioPayCapacitorJsPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        let headerColor = call.getString("headerColor")
+
         DispatchQueue.main.async {
             self.implementation.openHostedCheckout(
                 checkoutUrl: checkoutUrl,
                 returnUrlPrefix: returnUrlPrefix,
+                headerColor: headerColor,
                 presentingViewController: presentingViewController
             ) { result in
                 switch result {

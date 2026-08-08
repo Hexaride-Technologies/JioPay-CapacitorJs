@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -17,6 +19,11 @@ import android.widget.ProgressBar;
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 /**
  * Hosts JioPay's checkout page in an embedded WebView so navigation can be
@@ -30,12 +37,15 @@ public class HostedCheckoutActivity extends AppCompatActivity {
     static final String EXTRA_CHECKOUT_URL = "checkoutUrl";
     static final String EXTRA_RETURN_URL_PREFIX = "returnUrlPrefix";
     static final String EXTRA_SHOW_APP_BAR = "showAppBar";
+    static final String EXTRA_HEADER_COLOR = "headerColor";
     static final String EXTRA_LANDED_URL = "landedUrl";
+    private static final String DEFAULT_HEADER_COLOR = "#F9A000";
 
     private WebView webView;
     private ProgressBar progressBar;
 
     @SuppressLint("SetJavaScriptEnabled")
+    @SuppressWarnings("deprecation") // setStatusBarColor: still the correct way to tint the bar on pre-edge-to-edge Android
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,10 +53,18 @@ public class HostedCheckoutActivity extends AppCompatActivity {
         String checkoutUrl = getIntent().getStringExtra(EXTRA_CHECKOUT_URL);
         String returnUrlPrefix = getIntent().getStringExtra(EXTRA_RETURN_URL_PREFIX);
         boolean showAppBar = getIntent().getBooleanExtra(EXTRA_SHOW_APP_BAR, false);
+        String headerColorHex = getIntent().getStringExtra(EXTRA_HEADER_COLOR);
         if (checkoutUrl == null) {
             setResult(Activity.RESULT_CANCELED);
             finish();
             return;
+        }
+
+        int headerColor;
+        try {
+            headerColor = Color.parseColor(headerColorHex != null ? headerColorHex : DEFAULT_HEADER_COLOR);
+        } catch (IllegalArgumentException e) {
+            headerColor = Color.parseColor(DEFAULT_HEADER_COLOR);
         }
 
         // AppCompatActivity shows the app's default ActionBar unless told
@@ -57,10 +75,15 @@ public class HostedCheckoutActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             if (showAppBar) {
                 getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                getSupportActionBar().setBackgroundDrawable(new ColorDrawable(headerColor));
             } else {
                 getSupportActionBar().hide();
             }
         }
+
+        getWindow().setStatusBarColor(headerColor);
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        insetsController.setAppearanceLightStatusBars(isColorLight(headerColor));
 
         webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
@@ -118,6 +141,17 @@ public class HostedCheckoutActivity extends AppCompatActivity {
         progressParams.gravity = Gravity.CENTER;
         root.addView(progressBar, progressParams);
 
+        // Apps targeting SDK 35+ draw edge-to-edge by default, so with the
+        // ActionBar hidden nothing else reserves space for the status/nav
+        // bars — pad the root view by the system bar insets ourselves
+        // (mirrors what JioPay's own PaymentActivity does for the same
+        // reason).
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return insets;
+        });
+
         setContentView(root);
         webView.loadUrl(checkoutUrl);
 
@@ -131,6 +165,11 @@ public class HostedCheckoutActivity extends AppCompatActivity {
                     }
                 }
             );
+    }
+
+    private static boolean isColorLight(int color) {
+        double luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255;
+        return luminance > 0.5;
     }
 
     @Override

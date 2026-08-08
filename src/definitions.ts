@@ -27,6 +27,14 @@ export interface JioPayOpenHostedCheckoutOptions {
    * the bar's Back/Close button is the only way to leave). Ignored on Web.
    */
   showAppBar?: boolean;
+  /**
+   * Hex color (e.g. `"#F9A000"`) used to tint the status bar (and the app
+   * bar, when `showAppBar` is `true`) so the native chrome matches the
+   * checkout page's own branding. Defaults to JioPay's own brand orange.
+   * Status-bar icon contrast (light/dark) is chosen automatically based on
+   * this color. Android/iOS only — has no effect on Web.
+   */
+  headerColor?: string;
 }
 
 export interface JioPayHostedCheckoutResult {

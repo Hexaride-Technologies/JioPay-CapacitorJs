@@ -30,11 +30,13 @@ public class JioPayCapacitorJsPlugin extends Plugin {
         }
 
         boolean showAppBar = Boolean.TRUE.equals(call.getBoolean("showAppBar", false));
+        String headerColor = call.getString("headerColor");
 
         Intent intent = new Intent(getContext(), HostedCheckoutActivity.class);
         intent.putExtra(HostedCheckoutActivity.EXTRA_CHECKOUT_URL, checkoutUrl);
         intent.putExtra(HostedCheckoutActivity.EXTRA_RETURN_URL_PREFIX, returnUrlPrefix);
         intent.putExtra(HostedCheckoutActivity.EXTRA_SHOW_APP_BAR, showAppBar);
+        intent.putExtra(HostedCheckoutActivity.EXTRA_HEADER_COLOR, headerColor);
         startActivityForResult(call, intent, "handleCheckoutResult");
     }
 

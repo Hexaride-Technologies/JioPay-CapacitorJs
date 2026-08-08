@@ -12,18 +12,25 @@ enum HostedCheckoutOutcome {
 /// handed off via UIApplication.open so installed UPI apps still get invoked
 /// the way they would in a real browser.
 final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate {
+    private static let defaultHeaderColorHex = "#F9A000"
+
     private let checkoutUrl: URL
     private let returnUrlPrefix: String
     private let onOutcome: (HostedCheckoutOutcome) -> Void
+    private let headerColor: UIColor
+    private let headerColorIsLight: Bool
 
     private let webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     private var didReportOutcome = false
 
-    init(checkoutUrl: URL, returnUrlPrefix: String, onOutcome: @escaping (HostedCheckoutOutcome) -> Void) {
+    init(checkoutUrl: URL, returnUrlPrefix: String, headerColorHex: String?, onOutcome: @escaping (HostedCheckoutOutcome) -> Void) {
         self.checkoutUrl = checkoutUrl
         self.returnUrlPrefix = returnUrlPrefix
         self.onOutcome = onOutcome
+        let resolvedColor = headerColorHex.flatMap(Self.color(fromHex:)) ?? Self.color(fromHex: Self.defaultHeaderColorHex)!
+        self.headerColor = resolvedColor
+        self.headerColorIsLight = Self.isColorLight(resolvedColor)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -31,10 +38,25 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
         fatalError("init(coder:) has not been implemented")
     }
 
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        headerColorIsLight ? .darkContent : .lightContent
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
         view.backgroundColor = .systemBackground
+
+        if let navigationBar = navigationController?.navigationBar {
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = headerColor
+            let tintColor: UIColor = headerColorIsLight ? .black : .white
+            appearance.titleTextAttributes = [.foregroundColor: tintColor]
+            navigationBar.standardAppearance = appearance
+            navigationBar.scrollEdgeAppearance = appearance
+            navigationBar.tintColor = tintColor
+        }
 
         webView.navigationDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -54,6 +76,29 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
 
         updateBackButton()
         webView.load(URLRequest(url: checkoutUrl))
+    }
+
+    private static func color(fromHex hex: String) -> UIColor? {
+        var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hexString.hasPrefix("#") {
+            hexString.removeFirst()
+        }
+        guard hexString.count == 6, let rgbValue = UInt32(hexString, radix: 16) else {
+            return nil
+        }
+        let red = CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0
+        let green = CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0
+        let blue = CGFloat(rgbValue & 0x0000FF) / 255.0
+        return UIColor(red: red, green: green, blue: blue, alpha: 1.0)
+    }
+
+    private static func isColorLight(_ color: UIColor) -> Bool {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        let luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+        return luminance > 0.5
     }
 
     private func updateBackButton() {
