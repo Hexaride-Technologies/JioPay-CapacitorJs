@@ -11,8 +11,26 @@ enum HostedCheckoutOutcome {
 /// gateway flow is done, and any non-http(s) URL (upi://, gpay://, etc.) is
 /// handed off via UIApplication.open so installed UPI apps still get invoked
 /// the way they would in a real browser.
-final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate {
+final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate, UIScrollViewDelegate {
     private static let defaultHeaderColorHex = "#F9A000"
+
+    // WKWebView zooms in on its own whenever a focused <input> has an
+    // effective font-size under ~16px, regardless of what the remote
+    // checkout page's viewport meta tag says. Forcing the tag's content
+    // (and separately locking the scroll view's zoom scale below) covers
+    // pages that omit the tag entirely as well as ones that allow scaling.
+    private static let viewportFixScript = """
+    (function() {
+        var content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'viewport';
+            (document.head || document.documentElement).appendChild(meta);
+        }
+        meta.setAttribute('content', content);
+    })();
+    """
 
     private let checkoutUrl: URL
     private let returnUrlPrefix: String
@@ -20,8 +38,9 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
     private let headerColor: UIColor
     private let headerColorIsLight: Bool
 
-    private let webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+    private let webView = Self.makeWebView()
     private let activityIndicator = UIActivityIndicatorView(style: .large)
+    private let closeButton = UIButton(type: .system)
     private var didReportOutcome = false
 
     init(checkoutUrl: URL, returnUrlPrefix: String, headerColorHex: String?, onOutcome: @escaping (HostedCheckoutOutcome) -> Void) {
@@ -46,24 +65,21 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
         super.viewDidLoad()
 
         view.backgroundColor = .systemBackground
-
-        if let navigationBar = navigationController?.navigationBar {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = headerColor
-            let tintColor: UIColor = headerColorIsLight ? .black : .white
-            appearance.titleTextAttributes = [.foregroundColor: tintColor]
-            navigationBar.standardAppearance = appearance
-            navigationBar.scrollEdgeAppearance = appearance
-            navigationBar.tintColor = tintColor
-        }
+        navigationController?.setNavigationBarHidden(true, animated: false)
 
         webView.navigationDelegate = self
+        webView.scrollView.delegate = self
+        webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.maximumZoomScale = 1.0
+        webView.scrollView.pinchGestureRecognizer?.isEnabled = false
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
 
         activityIndicator.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(activityIndicator)
+
+        configureCloseButton()
+        view.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -72,10 +88,40 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            closeButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            closeButton.widthAnchor.constraint(equalToConstant: 36),
+            closeButton.heightAnchor.constraint(equalToConstant: 36),
         ])
 
-        updateBackButton()
         webView.load(URLRequest(url: checkoutUrl))
+    }
+
+    // MARK: - UIScrollViewDelegate
+
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        nil
+    }
+
+    private static func makeWebView() -> WKWebView {
+        let userScript = WKUserScript(source: viewportFixScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        let contentController = WKUserContentController()
+        contentController.addUserScript(userScript)
+
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController = contentController
+
+        return WKWebView(frame: .zero, configuration: configuration)
+    }
+
+    private func configureCloseButton() {
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.tintColor = headerColorIsLight ? .black : .white
+        closeButton.backgroundColor = headerColor.withAlphaComponent(0.9)
+        closeButton.layer.cornerRadius = 18
+        closeButton.layer.masksToBounds = true
+        closeButton.addTarget(self, action: #selector(backButtonTapped), for: .touchUpInside)
     }
 
     private static func color(fromHex hex: String) -> UIColor? {
@@ -101,11 +147,7 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
         return luminance > 0.5
     }
 
-    private func updateBackButton() {
-        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "Close", style: .plain, target: self, action: #selector(backButtonTapped))
-    }
-
-    // Never calls webView.goBack() — letting the bar button navigate the
+    // Never calls webView.goBack() — letting the close button navigate the
     // page can trigger unexpected behavior mid-checkout (e.g. re-submitting
     // a form, landing on a stale bank/ACS step). It always shows the cancel
     // confirmation instead.
@@ -168,17 +210,14 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         activityIndicator.stopAnimating()
-        updateBackButton()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         activityIndicator.stopAnimating()
-        updateBackButton()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         activityIndicator.stopAnimating()
-        updateBackButton()
     }
 
     private func parseQueryParams(from url: URL) -> [String: String] {
