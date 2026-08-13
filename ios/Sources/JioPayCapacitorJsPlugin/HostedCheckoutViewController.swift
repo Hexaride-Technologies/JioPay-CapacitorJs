@@ -38,7 +38,7 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
     private let headerColor: UIColor
     private let headerColorIsLight: Bool
 
-    private let webView = Self.makeWebView()
+    private let webView = HostedCheckoutViewController.makeWebView()
     private let activityIndicator = UIActivityIndicatorView(style: .large)
     private let closeButton = UIButton(type: .system)
     private var didReportOutcome = false
@@ -64,7 +64,7 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = headerColor
         navigationController?.setNavigationBarHidden(true, animated: false)
 
         webView.navigationDelegate = self
@@ -89,7 +89,7 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            closeButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            closeButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 25),
             closeButton.widthAnchor.constraint(equalToConstant: 36),
             closeButton.heightAnchor.constraint(equalToConstant: 36),
         ])
@@ -116,7 +116,7 @@ final class HostedCheckoutViewController: UIViewController, WKNavigationDelegate
 
     private func configureCloseButton() {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.setImage(UIImage(systemName: "arrow.left"), for: .normal)
         closeButton.tintColor = headerColorIsLight ? .black : .white
         closeButton.backgroundColor = headerColor.withAlphaComponent(0.9)
         closeButton.layer.cornerRadius = 18
