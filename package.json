@@ -1,6 +1,6 @@
 {
   "name": "jiopay-capacitorjs",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Capacitorjs wrapper for jiopay",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
